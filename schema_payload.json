@@ -1,0 +1,4 @@
+{
+    "schemaType": "PROTOBUF",
+    "schema": "syntax = \"proto3\";\npackage binanceDepthUpdateRaw.v1;\noption optimize_for = SPEED;\n\nenum Exchange {\n  EXCHANGE_UNSPECIFIED = 0;\n  EXCHANGE_UNRECOGNIZED = 1;\n  EXCHANGE_BINANCE = 2;\n  EXCHANGE_KUCOIN = 3;\n}\n\nmessage OrderBookEntry {\n    double price = 1;\n    double quantity = 2;\n}\n\nmessage DepthUpdate {\n  string eventType = 1;\n  int64 timestampMicro = 2;\n  int64 receptionTimeMicro = 3;\n  string symbol = 4;\n  int64 eventFirstUpdateId = 5;\n  int64 eventFinalUpdateId = 6;\n  repeated OrderBookEntry bidsToUpdate = 7;\n  repeated OrderBookEntry asksToUpdate = 8;\n  Exchange Exchange = 9;\n  bool isMonitored = 10;\n}"
+}

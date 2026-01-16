@@ -1,0 +1,49 @@
+[package]
+name = "msv-tokio-binance-scraper"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rdkafka = { version = "0.26", default-features = false, features = [
+    "cmake-build",
+    "ssl",
+    "zstd-pkg-config",
+] }
+tokio = { version = "1.45.1", features = [
+    "rt-multi-thread",
+    "macros",
+    "signal",
+] }
+anyhow = "1"
+serde_json = "1"
+fastwebsockets = { version = "0.10", features = ["upgrade"] }
+hyper = { version = "1", features = ["http1", "http2", "client"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+tokio-native-tls = "0.3"
+native-tls = "0.2"
+serde_yaml = "0.9"
+schema-core = { git = "ssh://git@github.com/charlescol/market-streaming-infra-schema-core.git", tag = "v0.8.1" }
+binance-spot-stream = { git = "ssh://git@github.com/charlescol/market-streaming-infra-schema-binance.git", tag = "v1.0.0", package = "binance-spot-stream" }
+serde = { version = "1.0", features = ["derive"] }
+schema_registry_converter = { version = "4.4.0", features = ["proto_raw"] }
+prost = "0.13.5"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "fmt",
+    "std",
+] }
+dotenv = "0.15"
+tracing-appender = "0.2"
+prometheus = "0.14"
+config = "0.15"
+lexical-core = "1.0.5"
+rand = "0.9.1"
+tokio-metrics = "0.4.2"
+thiserror = "1.0"
+futures = "0.3"
+uuid = { version = "1.0", features = ["v4"] }
+reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "json"] }
+http = "1.0"
+chrono = "0.4"

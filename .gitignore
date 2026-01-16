@@ -1,0 +1,8 @@
+target
+.env
+Cargo.lock
+.ssh
+resources/*
+!resources/examples
+.vscode
+.DS_Store

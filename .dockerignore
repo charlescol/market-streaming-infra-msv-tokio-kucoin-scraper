@@ -1,0 +1,13 @@
+target
+.env
+Dockerfile
+.dockerignore
+*.lock
+*.log
+.git
+.gitignore
+README.md
+LICENSE
+resources
+assets
+.vscode
