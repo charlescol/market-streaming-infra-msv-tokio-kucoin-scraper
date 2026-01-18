@@ -11,6 +11,7 @@ use msv_tokio_kucoin_scraper::prometheus::prometheus::Prometheus;
 use msv_tokio_kucoin_scraper::websocket::assigner::{Assigner, Group};
 use msv_tokio_kucoin_scraper::workflow::process_event::process_event;
 use msv_tokio_kucoin_scraper::workflow::queued_event::QueuedEvent;
+use schema_core::depth_update_raw_v1::DepthUpdate;
 use tokio::runtime::Builder;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::task::JoinSet;

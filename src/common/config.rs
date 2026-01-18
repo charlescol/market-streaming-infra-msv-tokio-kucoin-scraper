@@ -22,7 +22,6 @@ pub struct Config {
 #[derive(Debug, Clone)]
 pub struct KucoinConfig {
     pub host: String,
-    pub ws_push_url: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -105,7 +104,6 @@ impl Config {
                     "KUCOIN_API_HOST",
                     "https://api.kucoin.com".to_string(),
                 )?,
-                ws_push_url: ConfigLoader::optional_env_var("KUCOIN_WS_PUSH_URL"),
             },
 
             workflow: Self::load_workflow_config()?,
