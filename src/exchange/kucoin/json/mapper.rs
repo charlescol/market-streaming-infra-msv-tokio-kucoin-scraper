@@ -1,14 +1,19 @@
 use anyhow::Result;
-use schema_core::depth_update_raw_v1::DepthUpdate;
-use serde::Deserialize;
-use serde_json::Value;
+use lexical_core::parse as fast_parse;
+use schema_core::depth_update_raw_v1::{DepthUpdate, OrderBookEntry};
+use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
 
+use crate::common::error::WebSocketJsonError;
+
 #[derive(Debug, Deserialize)]
-struct KucoinDepthUpdate {
-    #[serde(rename = "type")]
-    subject: String,
-    data: KucoinDepthData,
+#[serde(tag = "type")]
+enum KucoinWsMessage {
+    #[serde(rename = "message")]
+    Message {
+        data: KucoinDepthData,
+        subject: String,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -25,58 +30,78 @@ struct KucoinDepthData {
 
 #[derive(Debug, Deserialize)]
 struct KucoinChanges {
-    asks: Vec<Vec<String>>,
-    bids: Vec<Vec<String>>,
+    #[serde(deserialize_with = "deserialize_orderbook_entries")]
+    asks: Vec<OrderBookEntry>,
+
+    #[serde(deserialize_with = "deserialize_orderbook_entries")]
+    bids: Vec<OrderBookEntry>,
 }
 
+/// Convert a Kucoin depth update message into a DepthUpdate struct.
+/// # Arguments
+/// - `msg`: The message to convert.
+/// - `symbol_map`: A map of symbols to convert.
+///
+/// # Returns
+/// A Result containing the converted DepthUpdate struct or an error.
 pub fn to_depth_update(
     msg: &str,
     symbol_map: Option<&HashMap<String, String>>,
-) -> Result<DepthUpdate> {
-    let parsed: Value = serde_json::from_str(msg)?;
+) -> Result<DepthUpdate, WebSocketJsonError> {
+    let parsed: KucoinWsMessage = serde_json::from_str(msg)
+        .map_err(|_| WebSocketJsonError::CannotParseMessage(msg.to_string()))?;
 
-    // Check for welcome message or other types
-    if let Some(msg_type) = parsed.get("type").and_then(|t| t.as_str()) {
-        if msg_type != "message" {
-            // Return error for non-update messages to be handled/ignored by caller
-            // Or better, define a custom error? For now, let's try to parse as update
-        }
-    }
-
-    let update: KucoinDepthUpdate = serde_json::from_value(parsed)?;
+    let KucoinWsMessage::Message { subject, data } = parsed;
 
     Ok(DepthUpdate {
-        event_type: update.subject,
-        timestamp_micro: (update.data.timestamp * 1000) as i64,
+        event_type: subject,
+        timestamp_micro: (data.timestamp * 1000) as i64,
         reception_time_micro: crate::common::utils::utc_micro::UtcMicro::now(),
         symbol: if let Some(map) = symbol_map {
-            map.get(&update.data.symbol)
-                .cloned()
-                .unwrap_or(update.data.symbol)
+            map.get(&data.symbol).cloned().unwrap_or(data.symbol)
         } else {
-            update.data.symbol
+            data.symbol
         },
-        event_first_update_id: update.data.sequence_start as i64,
-        event_final_update_id: update.data.sequence_end as i64,
-        bids_to_update: convert_entries(update.data.changes.bids),
-        asks_to_update: convert_entries(update.data.changes.asks),
-        // TODO: add Kucoin exchange to schema core
+        event_first_update_id: data.sequence_start as i64,
+        event_final_update_id: data.sequence_end as i64,
+        bids_to_update: data.changes.bids,
+        asks_to_update: data.changes.asks,
         exchange: 3,
         is_monitored: false,
     })
 }
 
-fn convert_entries(
-    entries: Vec<Vec<String>>,
-) -> Vec<schema_core::depth_update_raw_v1::OrderBookEntry> {
-    entries
-        .into_iter()
-        .filter_map(|e| {
-            // Price must be f64
-            let price = e[0].parse::<f64>().ok()?;
-            let quantity = e[1].parse::<f64>().ok()?; // Quantity expected as f64 per error msg
-
-            Some(schema_core::depth_update_raw_v1::OrderBookEntry { price, quantity })
+/// Deserialize a Kucoin orderbook entry.
+/// The Kucoin orderbook entries are represented as a tuple of strings (price, quantity).
+/// This function converts them into OrderBookEntry structs with f64 fields.
+/// # Arguments
+/// - `deserializer`: The deserializer to use.
+///
+/// # Returns
+/// A vector of OrderBookEntry structs.
+pub fn deserialize_orderbook_entries<'de, D>(
+    deserializer: D,
+) -> Result<Vec<OrderBookEntry>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let raw: Vec<Vec<&'de str>> = Deserialize::deserialize(deserializer)?;
+    raw.into_iter()
+        .map(|row| {
+            let price_s = row
+                .get(0)
+                .copied()
+                .ok_or_else(|| serde::de::Error::custom("missing price"))?;
+            let qty_s = row
+                .get(1)
+                .copied()
+                .ok_or_else(|| serde::de::Error::custom("missing qty"))?;
+            // Parse price and quantity
+            let price = fast_parse::<f64>(price_s.as_bytes())
+                .map_err(|e| serde::de::Error::custom(e.to_string()))?;
+            let quantity = fast_parse::<f64>(qty_s.as_bytes())
+                .map_err(|e| serde::de::Error::custom(e.to_string()))?;
+            Ok(OrderBookEntry { price, quantity })
         })
         .collect()
 }

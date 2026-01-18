@@ -13,7 +13,17 @@ use crate::{
     prometheus::prometheus::Prometheus, workflow::queued_event::QueuedEvent,
 };
 
-/// Read WebSocket frames deserializing them into depth update events (Kucoin).
+/// Read WebSocket frames deserializing them into depth update events.
+/// The events are sent to an internal queue for routing.
+///
+/// # Parameters
+/// - `ws`: The WebSocket connection.
+/// - `tx`: The internal queue sender.
+/// - `group_id`: The group identifier.
+/// - `prometheus`: The Prometheus metrics collector.
+///
+/// # Returns
+/// Ok(()) if the read was successful, or a WebSocketJsonError otherwise.
 pub async fn read_ws_json(
     mut ws: WebSocket<TokioIo<hyper::upgrade::Upgraded>>,
     tx_dispatch: HashMap<String, Sender<QueuedEvent<DepthUpdate>>>,
@@ -23,21 +33,19 @@ pub async fn read_ws_json(
 ) -> Result<(), WebSocketJsonError> {
     info!("Start reading frames (Kucoin)");
 
-    let ping_interval = Duration::from_secs(30);
+    let ping_interval = Duration::from_secs(18); // value recommanded by kucoin
 
     let mut ping_interval = tokio::time::interval(ping_interval);
     ping_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     // Read frames
     loop {
         tokio::select! {
+            // send ping at regular intervals
             _ = ping_interval.tick() => {
                  let now = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or(Duration::from_secs(0))
                     .as_millis();
-
-                // Only send ping if connection is established?
-                // The loop starts after connection.
 
                 let ping_msg = format!("{{\"id\":\"{}\",\"type\":\"ping\"}}", now);
                 debug!("Sending ping to Kucoin: {}", ping_msg);
@@ -47,7 +55,7 @@ pub async fn read_ws_json(
                 }
             }
             frame_res = ws.read_frame() => {
-                // Check if frame_res is error, etc.
+                // Check if frame_res is error
                  let Frame {
                     opcode, payload, ..
                 } = match frame_res {
