@@ -137,12 +137,18 @@ async fn create_topology(
 
     let kucoin_config = config.kucoin.clone();
 
-    // TODO: Fetch token once for simplicity, though it expires. Real world usage should refresh.
+    // The token is valid for only 24 hours, and a single connection is expected to be disconnected after 24 hours.
+    // TODO: refresh the token and reconnect automatically.
     info!("Fetching Kucoin public token from {}", kucoin_config.host);
     let (token, endpoint) = get_public_token(&kucoin_config.host).await?;
     info!("Got Kucoin token, using endpoint: {}", endpoint);
 
     for (group_id, stream_group) in stream_groups.iter().enumerate() {
+        info!(
+            "Stream group {} : {}",
+            group_id,
+            stream_group.values.join(", ")
+        );
         let process_tx_local = process_tx.clone();
         let prometheus = prometheus.clone();
         let token = token.clone();
