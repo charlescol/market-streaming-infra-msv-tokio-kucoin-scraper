@@ -10,7 +10,7 @@ use prometheus::{
 };
 use rand::random_bool;
 use rdkafka::Statistics;
-use schema_core::binance_depth_update_raw_v1::DepthUpdate;
+use schema_core::depth_update_raw_v1::DepthUpdate;
 use std::time::Duration;
 use tokio_metrics::RuntimeMonitor;
 use tracing::{Level, info, span};
@@ -382,14 +382,5 @@ impl Prometheus {
             }
         }
         Ok(())
-    }
-
-    /// Convert exchange id to name.
-    fn exchange_id_to_name(id: i32) -> &'static str {
-        match id {
-            1 => "Binance",
-            3 => "Kucoin", // Per previous conversation/code as placeholder
-            _ => "Unknown",
-        }
     }
 }

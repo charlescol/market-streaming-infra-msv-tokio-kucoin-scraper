@@ -3,22 +3,14 @@ use std::sync::Arc;
 
 use anyhow::{Error, Result};
 
-use msv_tokio_binance_scraper::common::config::Config;
-use msv_tokio_binance_scraper::common::enums::Format;
-use msv_tokio_binance_scraper::kafka::publisher::KafkaPublisher;
+use msv_tokio_kucoin_scraper::common::config::Config;
+use msv_tokio_kucoin_scraper::kafka::publisher::KafkaPublisher;
 
-use msv_tokio_binance_scraper::prometheus::handler::Handler;
-use msv_tokio_binance_scraper::prometheus::prometheus::Prometheus;
-use msv_tokio_binance_scraper::websocket::assigner::{Assigner, Group};
-use msv_tokio_binance_scraper::websocket::connect::{
-    connect_combined_insecure, create_binance_request,
-};
-use msv_tokio_binance_scraper::websocket::connect_combined;
-use msv_tokio_binance_scraper::workflow::process_event::process_event;
-use msv_tokio_binance_scraper::workflow::queued_event::QueuedEvent;
-use msv_tokio_binance_scraper::workflow::read_ws_json::read_ws_json;
-use msv_tokio_binance_scraper::workflow::read_ws_sbe::read_ws_sbe;
-use schema_core::binance_depth_update_raw_v1::DepthUpdate;
+use msv_tokio_kucoin_scraper::prometheus::handler::Handler;
+use msv_tokio_kucoin_scraper::prometheus::prometheus::Prometheus;
+use msv_tokio_kucoin_scraper::websocket::assigner::{Assigner, Group};
+use msv_tokio_kucoin_scraper::workflow::process_event::process_event;
+use msv_tokio_kucoin_scraper::workflow::queued_event::QueuedEvent;
 use tokio::runtime::Builder;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::task::JoinSet;
@@ -68,7 +60,7 @@ fn main() -> Result<()> {
 async fn run_app(config: Config) -> Result<()> {
     info!("Start the metrics server");
     let prometheus = Arc::new(Prometheus::new(&config.monitoring)?);
-    
+
     // Try to bind to the configured port, or increment up to 5 times
     let mut metrics_handle = None;
     let start_port = config.monitoring.metrics_port;
@@ -86,12 +78,14 @@ async fn run_app(config: Config) -> Result<()> {
             }
         }
     }
-    
+
     // If we couldn't start it at all, fail or warn?
     // The requirement implies we should help debug it, but making it robust is better.
     // If it fails all attempts, we should probably return error as Prometheus is central.
     if metrics_handle.is_none() {
-        return Err(anyhow::anyhow!("Could not start metrics server after 5 attempts"));
+        return Err(anyhow::anyhow!(
+            "Could not start metrics server after 5 attempts"
+        ));
     }
 
     if !config.enable_scraper {
@@ -160,81 +154,76 @@ async fn create_topology(
         });
     }
 
-    // Binance Streams
-    if !config.kucoin.enabled {
-        for (group_id, stream_group) in stream_groups.iter().enumerate() {
-            let process_tx_local = process_tx.clone();
-            let tls = config.source_tls;
-            let prometheus = prometheus.clone();
-            let binance_url = config.binance.host.clone();
-            let api_key = config.binance.api_key.clone();
-            let format = config.binance.ws_format.clone();
-            let port = config.binance.port;
-            let symbols = stream_group.values.clone();
-            tasks.spawn(async move {
-                let req = create_binance_request(&symbols, &binance_url, &format, &api_key)?;
-                let ws = if tls {
-                    connect_combined(&binance_url, port, req).await?
-                } else {
-                    connect_combined_insecure(&binance_url, port, req).await?
-                };
-                match format {
-                    Format::Json => {
-                        read_ws_json(ws, process_tx_local, group_id.to_string(), prometheus).await?
-                    }
-                    Format::Sbe => {
-                        read_ws_sbe(ws, process_tx_local, group_id.to_string(), prometheus).await?
-                    }
-                }
-                Ok(())
-            });
-        }
-    }
-
     // Kucoin Streams
-    if config.kucoin.enabled {
-        use msv_tokio_binance_scraper::websocket::connect_kucoin::{get_public_token, connect_kucoin, create_kucoin_subscription_message};
-        use msv_tokio_binance_scraper::workflow::read_ws_json_kucoin::read_ws_json_kucoin;
-        use fastwebsockets::Frame;
-        
-        let kucoin_config = config.kucoin.clone();
-        
-        // Fetch token once for simplicity, though it expires. Real world usage should refresh.
-        // Assuming the token lasts long enough for the session or connection logic handles it.
-        // The task description doesn't ask for full production resilience, but let's try to be decent.
-        // We will fetch it here.
-        info!("Fetching Kucoin public token from {}", kucoin_config.host);
-        let (token, endpoint) = get_public_token(&kucoin_config.host).await?;
-        info!("Got Kucoin token, using endpoint: {}", endpoint);
 
-        for (group_id, stream_group) in stream_groups.iter().enumerate() {
-            let process_tx_local = process_tx.clone();
-            let prometheus = prometheus.clone();
-            let symbols = stream_group.values.clone();
-            
-            // Prepare Kucoin symbols and mapping for this group
-            let kucoin_symbols: Vec<String> = symbols.iter().filter_map(|s| {
-                config.symbol_entries.iter().find(|e| e.canonical() == *s).map(|e| e.kucoin_symbol())
-            }).collect();
-            
-            let symbol_map: HashMap<String, String> = symbols.iter().filter_map(|s| {
-                config.symbol_entries.iter().find(|e| e.canonical() == *s).map(|e| (e.kucoin_symbol(), s.clone()))
-            }).collect();
+    use fastwebsockets::Frame;
+    use msv_tokio_kucoin_scraper::websocket::connect::{
+        connect_kucoin, create_kucoin_subscription_message, get_public_token,
+    };
+    use msv_tokio_kucoin_scraper::workflow::read_ws_json::read_ws_json;
 
-            let token = token.clone();
-            let endpoint = endpoint.clone();
-            
-            tasks.spawn(async move {
-                let mut ws = connect_kucoin(&endpoint, &token).await?;
-                
-                // Subscribe
-                let sub_msg = create_kucoin_subscription_message(&kucoin_symbols);
-                ws.write_frame(Frame::text(fastwebsockets::Payload::Owned(sub_msg.into_bytes()))).await.map_err(|e| anyhow::anyhow!("Failed to send subscription: {}", e))?;
-                
-                read_ws_json_kucoin(ws, process_tx_local, group_id.to_string(), prometheus, Some(symbol_map)).await?;
-                Ok(())
-            });
-        }
+    let kucoin_config = config.kucoin.clone();
+
+    // Fetch token once for simplicity, though it expires. Real world usage should refresh.
+    // Assuming the token lasts long enough for the session or connection logic handles it.
+    // The task description doesn't ask for full production resilience, but let's try to be decent.
+    // We will fetch it here.
+    info!("Fetching Kucoin public token from {}", kucoin_config.host);
+    let (token, endpoint) = get_public_token(&kucoin_config.host).await?;
+    info!("Got Kucoin token, using endpoint: {}", endpoint);
+
+    for (group_id, stream_group) in stream_groups.iter().enumerate() {
+        let process_tx_local = process_tx.clone();
+        let prometheus = prometheus.clone();
+        let symbols = stream_group.values.clone();
+
+        // Prepare Kucoin symbols and mapping for this group
+        let kucoin_symbols: Vec<String> = symbols
+            .iter()
+            .filter_map(|s| {
+                config
+                    .symbol_entries
+                    .iter()
+                    .find(|e| e.canonical() == *s)
+                    .map(|e| e.kucoin_symbol())
+            })
+            .collect();
+
+        let symbol_map: HashMap<String, String> = symbols
+            .iter()
+            .filter_map(|s| {
+                config
+                    .symbol_entries
+                    .iter()
+                    .find(|e| e.canonical() == *s)
+                    .map(|e| (e.kucoin_symbol(), s.clone()))
+            })
+            .collect();
+
+        let token = token.clone();
+        let endpoint = endpoint.clone();
+
+        tasks.spawn(async move {
+            let mut ws = connect_kucoin(&endpoint, &token).await?;
+
+            // Subscribe
+            let sub_msg = create_kucoin_subscription_message(&kucoin_symbols);
+            ws.write_frame(Frame::text(fastwebsockets::Payload::Owned(
+                sub_msg.into_bytes(),
+            )))
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to send subscription: {}", e))?;
+
+            read_ws_json(
+                ws,
+                process_tx_local,
+                group_id.to_string(),
+                prometheus,
+                Some(symbol_map),
+            )
+            .await?;
+            Ok(())
+        });
     }
 
     // Spawn the Tokio runtime monitor task

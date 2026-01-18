@@ -48,8 +48,8 @@ RUN apt-get update && apt-get install -y \
   && update-ca-certificates \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/target/release/msv-tokio-binance-scraper .
+COPY --from=builder /app/target/release/msv-tokio-kucoin-scraper .
 
 RUN mkdir -p ./resources
 
-ENTRYPOINT ["./msv-tokio-binance-scraper"]
+ENTRYPOINT ["./msv-tokio-kucoin-scraper"]

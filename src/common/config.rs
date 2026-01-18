@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 
-use crate::common::{config_loader::ConfigLoader, enums::Format, error::ConfigError};
+use crate::common::{config_loader::ConfigLoader, error::ConfigError};
 
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -9,7 +9,6 @@ pub struct Config {
     pub tokio_queue_interval: Option<u32>,
     pub tokio_event_interval: Option<u32>,
     pub enable_scraper: bool,
-    pub binance: BinanceConfig,
     pub workflow: WorkflowConfig,
     pub kafka: KafkaConfig,
     pub port: u16,
@@ -24,15 +23,6 @@ pub struct Config {
 pub struct KucoinConfig {
     pub host: String,
     pub ws_push_url: Option<String>,
-    pub enabled: bool,
-}
-
-#[derive(Debug, Clone)]
-pub struct BinanceConfig {
-    pub host: String,
-    pub port: u16,
-    pub api_key: Option<String>,
-    pub ws_format: Format,
 }
 
 #[derive(Debug, Clone)]
@@ -86,7 +76,9 @@ impl SymbolEntry {
     pub fn kucoin_symbol(&self) -> String {
         match self {
             SymbolEntry::Simple(s) => s.clone(),
-            SymbolEntry::Mapping { symbol, kucoin } => kucoin.clone().unwrap_or_else(|| symbol.clone()),
+            SymbolEntry::Mapping { symbol, kucoin } => {
+                kucoin.clone().unwrap_or_else(|| symbol.clone())
+            }
         }
     }
 }
@@ -108,16 +100,12 @@ impl Config {
             tokio_event_interval: ConfigLoader::optional_env_var("TOKIO_EVENT_INTERVAL"),
             enable_scraper: ConfigLoader::parse_or_default("ENABLE_SCRAPER", false)?,
             monitoring: Self::load_monitoring_config()?,
-            binance: BinanceConfig {
-                host: ConfigLoader::load_or_fail("BINANCE_WS_HOST")?,
-                port: ConfigLoader::try_parse_env_var("BINANCE_WS_PORT")?,
-                api_key: ConfigLoader::optional_env_var("BINANCE_API_KEY"),
-                ws_format: ConfigLoader::parse_or_default("BINANCE_WS_FORMAT", Format::Json)?,
-            },
             kucoin: KucoinConfig {
-                host: ConfigLoader::parse_or_default("KUCOIN_API_HOST", "https://api.kucoin.com".to_string())?,
+                host: ConfigLoader::parse_or_default(
+                    "KUCOIN_API_HOST",
+                    "https://api.kucoin.com".to_string(),
+                )?,
                 ws_push_url: ConfigLoader::optional_env_var("KUCOIN_WS_PUSH_URL"),
-                enabled: ConfigLoader::parse_or_default("KUCOIN_ENABLED", false)?,
             },
 
             workflow: Self::load_workflow_config()?,
@@ -126,10 +114,13 @@ impl Config {
             symbols: ConfigLoader::load_yaml_config::<SymbolConfig>(&ConfigLoader::load_or_fail(
                 "SYMBOL_CONFIG_PATH",
             )?)?
-            .symbols.iter().map(|s| s.canonical()).collect(),
-            symbol_entries: ConfigLoader::load_yaml_config::<SymbolConfig>(&ConfigLoader::load_or_fail(
-                "SYMBOL_CONFIG_PATH",
-            )?)?
+            .symbols
+            .iter()
+            .map(|s| s.canonical())
+            .collect(),
+            symbol_entries: ConfigLoader::load_yaml_config::<SymbolConfig>(
+                &ConfigLoader::load_or_fail("SYMBOL_CONFIG_PATH")?,
+            )?
             .symbols,
             source_tls: ConfigLoader::parse_or_default("SOURCE_TLS", false)?,
         })
