@@ -29,15 +29,13 @@ pub async fn read_ws_json(
     tx_dispatch: HashMap<String, Sender<QueuedEvent<DepthUpdate>>>,
     group_id: String,
     prometheus: Arc<Prometheus>,
-    symbol_map: Option<HashMap<String, String>>,
+    ping_interval_seconds: u64,
 ) -> Result<(), WebSocketJsonError> {
     info!("Start reading frames (Kucoin)");
 
-    let ping_interval = Duration::from_secs(18); // value recommanded by kucoin
+    let mut ping_interval = tokio::time::interval(Duration::from_secs(ping_interval_seconds));
 
-    let mut ping_interval = tokio::time::interval(ping_interval);
     ping_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-    // Read frames
     loop {
         tokio::select! {
             // send ping at regular intervals
@@ -54,8 +52,8 @@ pub async fn read_ws_json(
                     return Err(WebSocketJsonError::CannotReceiveMessage(e.to_string()));
                 }
             }
+            // read frame
             frame_res = ws.read_frame() => {
-                // Check if frame_res is error
                  let Frame {
                     opcode, payload, ..
                 } = match frame_res {
@@ -84,7 +82,7 @@ pub async fn read_ws_json(
                             }
                         }
 
-                        let event = match to_depth_update(txt, symbol_map.as_ref()) {
+                        let event = match to_depth_update(txt) {
                             Ok(e) => e,
                             Err(e) => {
                                 warn!("Failed to parse Kucoin depth update: {} Text: {}", e, txt);

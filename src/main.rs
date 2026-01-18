@@ -6,11 +6,16 @@ use anyhow::{Error, Result};
 use msv_tokio_kucoin_scraper::common::config::Config;
 use msv_tokio_kucoin_scraper::kafka::publisher::KafkaPublisher;
 
+use fastwebsockets::Frame;
 use msv_tokio_kucoin_scraper::prometheus::handler::Handler;
 use msv_tokio_kucoin_scraper::prometheus::prometheus::Prometheus;
 use msv_tokio_kucoin_scraper::websocket::assigner::{Assigner, Group};
+use msv_tokio_kucoin_scraper::websocket::connect::{
+    connect_kucoin, create_kucoin_subscription_message, get_public_token,
+};
 use msv_tokio_kucoin_scraper::workflow::process_event::process_event;
 use msv_tokio_kucoin_scraper::workflow::queued_event::QueuedEvent;
+use msv_tokio_kucoin_scraper::workflow::read_ws_json::read_ws_json;
 use schema_core::depth_update_raw_v1::DepthUpdate;
 use tokio::runtime::Builder;
 use tokio::sync::mpsc::{self, Receiver, Sender};
@@ -62,32 +67,7 @@ async fn run_app(config: Config) -> Result<()> {
     info!("Start the metrics server");
     let prometheus = Arc::new(Prometheus::new(&config.monitoring)?);
 
-    // Try to bind to the configured port, or increment up to 5 times
-    let mut metrics_handle = None;
-    let start_port = config.monitoring.metrics_port;
-    for i in 0..5 {
-        let port = start_port + i;
-        match Handler::start_metrics_server(port).await {
-            Ok(handle) => {
-                info!("Metrics server started on port {}", port);
-                metrics_handle = Some(handle);
-                break;
-            }
-            Err(e) => {
-                error!("Failed to start metrics server on port {}: {:?}", port, e);
-                // Continue to next port
-            }
-        }
-    }
-
-    // If we couldn't start it at all, fail or warn?
-    // The requirement implies we should help debug it, but making it robust is better.
-    // If it fails all attempts, we should probably return error as Prometheus is central.
-    if metrics_handle.is_none() {
-        return Err(anyhow::anyhow!(
-            "Could not start metrics server after 5 attempts"
-        ));
-    }
+    Handler::start_metrics_server(config.monitoring.metrics_port).await?;
 
     if !config.enable_scraper {
         info!("Scraper is disabled");
@@ -155,20 +135,9 @@ async fn create_topology(
         });
     }
 
-    // Kucoin Streams
-
-    use fastwebsockets::Frame;
-    use msv_tokio_kucoin_scraper::websocket::connect::{
-        connect_kucoin, create_kucoin_subscription_message, get_public_token,
-    };
-    use msv_tokio_kucoin_scraper::workflow::read_ws_json::read_ws_json;
-
     let kucoin_config = config.kucoin.clone();
 
-    // Fetch token once for simplicity, though it expires. Real world usage should refresh.
-    // Assuming the token lasts long enough for the session or connection logic handles it.
-    // The task description doesn't ask for full production resilience, but let's try to be decent.
-    // We will fetch it here.
+    // TODO: Fetch token once for simplicity, though it expires. Real world usage should refresh.
     info!("Fetching Kucoin public token from {}", kucoin_config.host);
     let (token, endpoint) = get_public_token(&kucoin_config.host).await?;
     info!("Got Kucoin token, using endpoint: {}", endpoint);
@@ -176,39 +145,15 @@ async fn create_topology(
     for (group_id, stream_group) in stream_groups.iter().enumerate() {
         let process_tx_local = process_tx.clone();
         let prometheus = prometheus.clone();
-        let symbols = stream_group.values.clone();
-
-        // Prepare Kucoin symbols and mapping for this group
-        let kucoin_symbols: Vec<String> = symbols
-            .iter()
-            .filter_map(|s| {
-                config
-                    .symbol_entries
-                    .iter()
-                    .find(|e| e.canonical() == *s)
-                    .map(|e| e.kucoin_symbol())
-            })
-            .collect();
-
-        let symbol_map: HashMap<String, String> = symbols
-            .iter()
-            .filter_map(|s| {
-                config
-                    .symbol_entries
-                    .iter()
-                    .find(|e| e.canonical() == *s)
-                    .map(|e| (e.kucoin_symbol(), s.clone()))
-            })
-            .collect();
-
         let token = token.clone();
         let endpoint = endpoint.clone();
-
+        let ping_interval_seconds = config.kucoin.ping_interval_seconds;
+        let symbols = stream_group.values.clone();
         tasks.spawn(async move {
             let mut ws = connect_kucoin(&endpoint, &token).await?;
 
             // Subscribe
-            let sub_msg = create_kucoin_subscription_message(&kucoin_symbols);
+            let sub_msg = create_kucoin_subscription_message(&symbols);
             ws.write_frame(Frame::text(fastwebsockets::Payload::Owned(
                 sub_msg.into_bytes(),
             )))
@@ -220,7 +165,7 @@ async fn create_topology(
                 process_tx_local,
                 group_id.to_string(),
                 prometheus,
-                Some(symbol_map),
+                ping_interval_seconds,
             )
             .await?;
             Ok(())

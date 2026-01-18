@@ -2,7 +2,6 @@ use anyhow::Result;
 use lexical_core::parse as fast_parse;
 use schema_core::depth_update_raw_v1::{DepthUpdate, OrderBookEntry};
 use serde::{Deserialize, Deserializer};
-use std::collections::HashMap;
 
 use crate::common::error::WebSocketJsonError;
 
@@ -38,16 +37,13 @@ struct KucoinChanges {
 }
 
 /// Convert a Kucoin depth update message into a DepthUpdate struct.
+/// The symbol is converted to a string without the first dash.
 /// # Arguments
 /// - `msg`: The message to convert.
-/// - `symbol_map`: A map of symbols to convert.
 ///
 /// # Returns
 /// A Result containing the converted DepthUpdate struct or an error.
-pub fn to_depth_update(
-    msg: &str,
-    symbol_map: Option<&HashMap<String, String>>,
-) -> Result<DepthUpdate, WebSocketJsonError> {
+pub fn to_depth_update(msg: &str) -> Result<DepthUpdate, WebSocketJsonError> {
     let parsed: KucoinWsMessage = serde_json::from_str(msg)
         .map_err(|_| WebSocketJsonError::CannotParseMessage(msg.to_string()))?;
 
@@ -57,11 +53,7 @@ pub fn to_depth_update(
         event_type: subject,
         timestamp_micro: (data.timestamp * 1000) as i64,
         reception_time_micro: crate::common::utils::utc_micro::UtcMicro::now(),
-        symbol: if let Some(map) = symbol_map {
-            map.get(&data.symbol).cloned().unwrap_or(data.symbol)
-        } else {
-            data.symbol
-        },
+        symbol: data.symbol,
         event_first_update_id: data.sequence_start as i64,
         event_final_update_id: data.sequence_end as i64,
         bids_to_update: data.changes.bids,

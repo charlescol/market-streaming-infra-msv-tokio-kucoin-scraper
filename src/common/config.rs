@@ -13,7 +13,6 @@ pub struct Config {
     pub kafka: KafkaConfig,
     pub port: u16,
     pub symbols: Vec<String>,
-    pub symbol_entries: Vec<SymbolEntry>,
     pub monitoring: MonitoringConfig,
     pub source_tls: bool,
     pub kucoin: KucoinConfig,
@@ -22,6 +21,7 @@ pub struct Config {
 #[derive(Debug, Clone)]
 pub struct KucoinConfig {
     pub host: String,
+    pub ping_interval_seconds: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -64,27 +64,9 @@ pub enum SymbolEntry {
     },
 }
 
-impl SymbolEntry {
-    pub fn canonical(&self) -> String {
-        match self {
-            SymbolEntry::Simple(s) => s.clone(),
-            SymbolEntry::Mapping { symbol, .. } => symbol.clone(),
-        }
-    }
-
-    pub fn kucoin_symbol(&self) -> String {
-        match self {
-            SymbolEntry::Simple(s) => s.clone(),
-            SymbolEntry::Mapping { symbol, kucoin } => {
-                kucoin.clone().unwrap_or_else(|| symbol.clone())
-            }
-        }
-    }
-}
-
 #[derive(Debug, Deserialize, Clone)]
 pub struct SymbolConfig {
-    pub symbols: Vec<SymbolEntry>,
+    pub symbols: Vec<String>,
 }
 
 impl Config {
@@ -104,6 +86,10 @@ impl Config {
                     "KUCOIN_API_HOST",
                     "https://api.kucoin.com".to_string(),
                 )?,
+                ping_interval_seconds: ConfigLoader::parse_or_default(
+                    "KUCOIN_PING_INTERVAL_SECONDS",
+                    18, // value recommanded by kucoin
+                )?,
             },
 
             workflow: Self::load_workflow_config()?,
@@ -112,13 +98,6 @@ impl Config {
             symbols: ConfigLoader::load_yaml_config::<SymbolConfig>(&ConfigLoader::load_or_fail(
                 "SYMBOL_CONFIG_PATH",
             )?)?
-            .symbols
-            .iter()
-            .map(|s| s.canonical())
-            .collect(),
-            symbol_entries: ConfigLoader::load_yaml_config::<SymbolConfig>(
-                &ConfigLoader::load_or_fail("SYMBOL_CONFIG_PATH")?,
-            )?
             .symbols,
             source_tls: ConfigLoader::parse_or_default("SOURCE_TLS", false)?,
         })
