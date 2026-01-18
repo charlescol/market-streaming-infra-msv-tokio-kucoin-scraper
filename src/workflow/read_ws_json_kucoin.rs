@@ -1,12 +1,12 @@
+use std::time::Duration;
 use std::{collections::HashMap, sync::Arc};
-use std::time::{Duration};
 
 use fastwebsockets::{Frame, OpCode, WebSocket};
 use hyper_util::rt::TokioIo;
 use schema_core::binance_depth_update_raw_v1::DepthUpdate;
-use tokio::sync::mpsc::{Sender, error::TrySendError};
-use tracing::{error, info, debug, warn};
 use serde_json::Value;
+use tokio::sync::mpsc::{Sender, error::TrySendError};
+use tracing::{debug, error, info, warn};
 
 use crate::{
     common::error::WebSocketJsonError, exchange::kucoin::json::mapper::to_depth_update,
@@ -22,17 +22,11 @@ pub async fn read_ws_json_kucoin(
     symbol_map: Option<HashMap<String, String>>,
 ) -> Result<(), WebSocketJsonError> {
     info!("Start reading frames (Kucoin)");
-    
-    let mut last_ping = std::time::Instant::now();
+
     let ping_interval = Duration::from_secs(30);
 
     let mut ping_interval = tokio::time::interval(ping_interval);
     ping_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-    // The first tick completes immediately. using reset() can shift it? 
-    // Or just let it ping immediately once. It's harmless.
-    // Actually, let's call reset to push it 30s in future if we want.
-    // But sending one ping at start is fine.
-    
     // Read frames
     loop {
         tokio::select! {
@@ -41,10 +35,10 @@ pub async fn read_ws_json_kucoin(
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or(Duration::from_secs(0))
                     .as_millis();
-                
+
                 // Only send ping if connection is established?
                 // The loop starts after connection.
-                
+
                 let ping_msg = format!("{{\"id\":\"{}\",\"type\":\"ping\"}}", now);
                 debug!("Sending ping to Kucoin: {}", ping_msg);
                 if let Err(e) = ws.write_frame(Frame::text(fastwebsockets::Payload::Owned(ping_msg.into_bytes()))).await {
