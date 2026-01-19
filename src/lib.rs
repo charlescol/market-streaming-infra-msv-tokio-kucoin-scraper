@@ -2,7 +2,6 @@ pub mod common {
     pub mod config;
     pub mod config_loader;
     pub mod constants;
-    pub mod enums;
     pub mod error;
     pub mod utils {
         pub mod spawn_exec;
