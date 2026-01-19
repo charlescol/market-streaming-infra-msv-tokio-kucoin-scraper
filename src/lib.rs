@@ -11,17 +11,6 @@ pub mod common {
 }
 
 pub mod exchange {
-    pub mod binance {
-        pub mod json {
-            pub mod mapper;
-            pub mod types;
-            pub mod utils;
-        }
-        pub mod sbe {
-            pub mod mapper;
-            pub mod utils;
-        }
-    }
     pub mod kucoin {
         pub mod json {
             pub mod mapper;
@@ -36,14 +25,10 @@ pub mod workflow {
     pub mod process_event;
     pub mod queued_event;
     pub mod read_ws_json;
-    pub mod read_ws_json_kucoin;
-    pub mod read_ws_sbe;
 }
 pub mod websocket {
     pub mod assigner;
     pub mod connect;
-    pub mod connect_kucoin;
-    pub use connect::connect_combined;
 }
 pub mod prometheus {
     pub mod handler;

@@ -1,0 +1,9 @@
+acks: 1
+linger.ms: 1
+batch.size: 18000
+compression.type: none
+retries: 1
+message.timeout.ms: 1000
+broker.address.family: v4
+statistics.interval.ms: 1000
+log_level: 7

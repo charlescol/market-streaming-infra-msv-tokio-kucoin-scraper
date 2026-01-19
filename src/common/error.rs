@@ -16,15 +16,6 @@ pub enum ConfigError {
 }
 
 #[derive(Debug, Error)]
-pub enum DispatchError {
-    #[error("Internal dispatch queue is closed for symbols {0}")]
-    DispatchClosed(String),
-
-    #[error("Failed to monitor dispath stage: {0}")]
-    FailedToMonitorDispatchStage(#[from] MonitoringError),
-}
-
-#[derive(Debug, Error)]
 pub enum ProcessError {
     #[error("Internal processing queue is closed for symbols {0}")]
     ProcessClosed(String),

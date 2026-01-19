@@ -10,7 +10,7 @@ use prometheus::{
 };
 use rand::random_bool;
 use rdkafka::Statistics;
-use schema_core::binance_depth_update_raw_v1::DepthUpdate;
+use schema_core::depth_update_raw_v1::DepthUpdate;
 use std::time::Duration;
 use tokio_metrics::RuntimeMonitor;
 use tracing::{Level, info, span};
@@ -279,7 +279,6 @@ impl Prometheus {
         &self,
         queued_event: &QueuedEvent<DepthUpdate>,
     ) -> Result<(), MonitoringError> {
-        let exchange_name = Self::exchange_id_to_name(queued_event.msg.exchange);
         // Log if verbose ebnabled
         if tracing::enabled!(tracing::Level::INFO)
             && self.config.enable_metrics_verbose
@@ -297,7 +296,7 @@ impl Prometheus {
             // Exchange to scraper latency in ms
             self.workflow_metrics
                 .exchange_to_scraper_latency_ms_vec
-                .with_label_values(&[exchange_name])
+                .with_label_values(&[KUCOIN_EXCHANGE_NAME])
                 .observe(
                     (queued_event.msg.reception_time_micro - queued_event.msg.timestamp_micro)
                         as f64,
@@ -308,7 +307,7 @@ impl Prometheus {
 
             self.workflow_metrics
                 .scraper_rdkadka_latency_us_vec
-                .with_label_values(&[exchange_name])
+                .with_label_values(&[KUCOIN_EXCHANGE_NAME])
                 .observe((timestamp_us - queued_event.msg.reception_time_micro) as f64);
 
             // Process buffer latency in us
@@ -324,7 +323,7 @@ impl Prometheus {
             // Monitor the number of updates
             metrics
                 .update_count_total
-                .with_label_values(&[queued_event.msg.symbol.as_str(), exchange_name])
+                .with_label_values(&[queued_event.msg.symbol.as_str(), KUCOIN_EXCHANGE_NAME])
                 .inc_by(
                     (queued_event.msg.asks_to_update.len() + queued_event.msg.bids_to_update.len())
                         as u64,
@@ -382,14 +381,5 @@ impl Prometheus {
             }
         }
         Ok(())
-    }
-
-    /// Convert exchange id to name.
-    fn exchange_id_to_name(id: i32) -> &'static str {
-        match id {
-            1 => "Binance",
-            3 => "Kucoin", // Per previous conversation/code as placeholder
-            _ => "Unknown",
-        }
     }
 }

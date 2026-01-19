@@ -53,6 +53,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/msv-tokio-binance-scraper:${{ env.TAG_VERSION }}
+          tags: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPO }}/msv-tokio-kucoin-scraper:${{ env.TAG_VERSION }}
           cache-from: type=gha,scope=${{ github.workflow }}-${{ github.ref_name }}
           cache-to: type=gha,mode=max,scope=${{ github.workflow }}-${{ github.ref_name }}

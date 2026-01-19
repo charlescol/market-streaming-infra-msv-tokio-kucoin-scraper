@@ -5,7 +5,7 @@ use rdkafka::{
     ClientConfig,
     producer::{FutureProducer, FutureRecord},
 };
-use schema_core::constants::BINANCEDEPTHUPDATERAW_V1_DEPTHUPDATE_SUBJECT;
+use schema_core::constants::DEPTHUPDATERAW_V1_DEPTHUPDATE_SUBJECT;
 use schema_registry_converter::{
     async_impl::{proto_raw::ProtoRawEncoder, schema_registry::SrSettings},
     schema_registry_common::SubjectNameStrategy,
@@ -53,7 +53,7 @@ impl KafkaPublisher {
 
         config_builder.set("bootstrap.servers", &config.broker_host);
 
-        let subject_name = BINANCEDEPTHUPDATERAW_V1_DEPTHUPDATE_SUBJECT.to_string();
+        let subject_name = DEPTHUPDATERAW_V1_DEPTHUPDATE_SUBJECT.to_string();
 
         KafkaPublisher {
             producer: config_builder

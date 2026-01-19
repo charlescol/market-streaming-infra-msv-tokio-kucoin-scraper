@@ -1,10 +1,10 @@
-# Binance Depth Update Kafka Scraper
+# Kucoin Depth Update Kafka Scraper
 
-A high-performance, asynchronous Rust service that scrapes Binance WebSocket depth updates and publishes them to Kafka.
+A high-performance, asynchronous Rust service that scrapes Kucoin WebSocket depth updates and publishes them to Kafka.
 
 ## Features
 
-- Accepted input formats: **JSON** or **SBE** (depending on configuration)
+- Accepted input formats: **JSON**
 - Output format: **Protobuf** (versioned via `Confluent Schema Registry`)
 - Monitoring: `Prometheus`
 - Websocket: `FastWebSockets`
@@ -16,7 +16,6 @@ A high-performance, asynchronous Rust service that scrapes Binance WebSocket dep
 - Rust toolchain
 - A running Kafka cluster
 - Access to the required schema repositories
-- (Optional) Binance API key for SBE access
 
 ## Usage
 
@@ -32,13 +31,10 @@ cargo build && cargo run
 **Note 1**: reading access to the following repos is required:
 
 - [market-streaming-infra-schema-core](https://github.com/charlescol/market-streaming-infra-schema-core)
-- [market-streaming-infra-schema-binance](https://github.com/charlescol/market-streaming-infra-schema-binance)
 
 **Note 2**: To run locally, you need to have a local Kafka instance running.
 
-**Note 3**: To access the SBE API, you need to have a valid Binance API key (set in the `.env` file as `BINANCE_API_KEY`).
-
-**Note 4**: To build a local Docker image, you need to have a valid ssh `id_rsa` key in the `.ssh` folder with the required permissions to access the repos mentioned in _Note 1_.
+**Note 3**: To build a local Docker image, you need to have a valid ssh `id_rsa` key in the `.ssh` folder with the required permissions to access the repos mentioned in _Note 1_.
 
 ## Architecture
 
