@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use fastwebsockets::{Frame, OpCode, WebSocket};
 use hyper_util::rt::TokioIo;
-use schema_core::depth_update_raw_v1::DepthUpdate;
+use schema_core::exchange_depth_update_raw_v1::DepthUpdate;
 use serde_json::Value;
 use tokio::sync::mpsc::{Sender, error::TrySendError};
 use tracing::{debug, error, info, warn};

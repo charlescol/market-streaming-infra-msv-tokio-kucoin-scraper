@@ -16,7 +16,7 @@ use msv_tokio_kucoin_scraper::websocket::connect::{
 use msv_tokio_kucoin_scraper::workflow::process_event::process_event;
 use msv_tokio_kucoin_scraper::workflow::queued_event::QueuedEvent;
 use msv_tokio_kucoin_scraper::workflow::read_ws_json::read_ws_json;
-use schema_core::depth_update_raw_v1::DepthUpdate;
+use schema_core::exchange_depth_update_raw_v1::DepthUpdate;
 use tokio::runtime::Builder;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::task::JoinSet;

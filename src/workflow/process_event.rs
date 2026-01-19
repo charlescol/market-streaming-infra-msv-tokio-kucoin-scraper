@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use futures::{FutureExt, StreamExt, stream::FuturesUnordered};
 
-use schema_core::depth_update_raw_v1::DepthUpdate;
+use schema_core::exchange_depth_update_raw_v1::DepthUpdate;
 use tokio::sync::mpsc::Receiver;
 use tracing::error;
 

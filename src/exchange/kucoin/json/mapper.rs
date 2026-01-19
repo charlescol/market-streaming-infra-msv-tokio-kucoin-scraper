@@ -1,6 +1,6 @@
 use anyhow::Result;
 use lexical_core::parse as fast_parse;
-use schema_core::depth_update_raw_v1::{DepthUpdate, OrderBookEntry};
+use schema_core::exchange_depth_update_raw_v1::{DepthUpdate, Exchange, OrderBookEntry};
 use serde::{Deserialize, Deserializer};
 
 use crate::common::error::WebSocketJsonError;
@@ -58,7 +58,7 @@ pub fn to_depth_update(msg: &str) -> Result<DepthUpdate, WebSocketJsonError> {
         event_final_update_id: data.sequence_end as i64,
         bids_to_update: data.changes.bids,
         asks_to_update: data.changes.asks,
-        exchange: 3,
+        exchange: Exchange::Kucoin as i32,
         is_monitored: false,
     })
 }

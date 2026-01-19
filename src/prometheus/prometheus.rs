@@ -10,7 +10,7 @@ use prometheus::{
 };
 use rand::random_bool;
 use rdkafka::Statistics;
-use schema_core::depth_update_raw_v1::DepthUpdate;
+use schema_core::exchange_depth_update_raw_v1::DepthUpdate;
 use std::time::Duration;
 use tokio_metrics::RuntimeMonitor;
 use tracing::{Level, info, span};
