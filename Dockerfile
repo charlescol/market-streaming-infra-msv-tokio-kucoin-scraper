@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
  zlib1g-dev \
  libsasl2-dev \
  clang \
+ libcurl4-openssl-dev \
  libclang-dev
 
 # Use the cargo git fetch with CLI 
