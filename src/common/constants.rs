@@ -1,6 +1,4 @@
-pub const METRICS_PREFIX: &str = "tokio_kucoin_scraper_";
-
-pub const KUCOIN_EXCHANGE_NAME: &str = "kucoin";
+pub const METRICS_PREFIX: &str = "tokio_scraper_";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Workflow metrics

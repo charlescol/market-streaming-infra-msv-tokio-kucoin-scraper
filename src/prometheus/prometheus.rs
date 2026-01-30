@@ -29,11 +29,9 @@ pub struct Prometheus {
 pub struct WorflowMetrics {
     pub latency_process_buffer: Histogram,
     pub process_buffer_full: IntGaugeVec,
-    pub exchange_to_scraper_latency_ms_vec: HistogramVec,
-    pub scraper_rdkadka_latency_us_vec: HistogramVec,
+    pub exchange_to_scraper_latency_ms: Histogram,
+    pub scraper_rdkadka_latency_us: Histogram,
 }
-
-use prometheus::HistogramVec;
 
 pub struct TokioMetrics {
     pub tokio_task_running: IntGauge,
@@ -141,7 +139,7 @@ impl Prometheus {
                 update_count_total: register_int_counter_vec!(
                     &format!("{}{}", METRICS_PREFIX, UPDATE_COUNT_TOTAL_NAME),
                     UPDATE_COUNT_TOTAL_DESC,
-                    &["symbol", "exchange"]
+                    &["symbol"]
                 )?,
             });
         }
@@ -162,22 +160,20 @@ impl Prometheus {
                     PROCESS_BUFFER_FULL_COUNTER_DESC,
                     &["group_id"]
                 )?,
-                exchange_to_scraper_latency_ms_vec: prometheus::register_histogram_vec!(
+                exchange_to_scraper_latency_ms: prometheus::register_histogram!(
                     &format!(
                         "{}{}",
                         METRICS_PREFIX, EXCHANGE_TO_SCRAPER_LATENCY_HISTOGRAM_NAME
                     ),
                     EXCHANGE_TO_SCRAPER_LATENCY_HISTOGRAM_DESCRIPTION,
-                    &["exchange"],
                     prometheus::exponential_buckets(1.0, 3.0, 9)?
                 )?,
-                scraper_rdkadka_latency_us_vec: prometheus::register_histogram_vec!(
+                scraper_rdkadka_latency_us: prometheus::register_histogram!(
                     &format!(
                         "{}{}",
                         METRICS_PREFIX, SCRAPER_RDKADKA_LATENCY_HISTOGRAM_NAME
                     ),
                     SCRAPER_RDKADKA_LATENCY_HISTOGRAM_DESCRIPTION,
-                    &["exchange"],
                     prometheus::exponential_buckets(10.0, 3.0, 9)?
                 )?,
             },
@@ -295,8 +291,7 @@ impl Prometheus {
         if queued_event.msg.is_monitored {
             // Exchange to scraper latency in ms
             self.workflow_metrics
-                .exchange_to_scraper_latency_ms_vec
-                .with_label_values(&[KUCOIN_EXCHANGE_NAME])
+                .exchange_to_scraper_latency_ms
                 .observe(
                     (queued_event.msg.reception_time_micro - queued_event.msg.timestamp_micro)
                         as f64,
@@ -306,8 +301,7 @@ impl Prometheus {
             let timestamp_us = UtcMicro::now();
 
             self.workflow_metrics
-                .scraper_rdkadka_latency_us_vec
-                .with_label_values(&[KUCOIN_EXCHANGE_NAME])
+                .scraper_rdkadka_latency_us
                 .observe((timestamp_us - queued_event.msg.reception_time_micro) as f64);
 
             // Process buffer latency in us
@@ -323,7 +317,7 @@ impl Prometheus {
             // Monitor the number of updates
             metrics
                 .update_count_total
-                .with_label_values(&[queued_event.msg.symbol.as_str(), KUCOIN_EXCHANGE_NAME])
+                .with_label_values(&[queued_event.msg.symbol.as_str()])
                 .inc_by(
                     (queued_event.msg.asks_to_update.len() + queued_event.msg.bids_to_update.len())
                         as u64,
