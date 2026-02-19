@@ -59,7 +59,7 @@ pub async fn get_public_token(host: &str) -> Result<(String, String)> {
 }
 
 /// Connect to Kucoin WebSocket.
-pub async fn connect_kucoin(
+pub async fn connect_kucoin_classic_spot_public(
     endpoint: &str,
     token: &str,
 ) -> Result<WebSocket<TokioIo<hyper::upgrade::Upgraded>>, WebSocketError> {
@@ -110,7 +110,7 @@ pub async fn connect_kucoin(
     Ok(ws)
 }
 
-pub fn create_kucoin_subscription_message(kucoin_symbols: &[String]) -> String {
+pub fn create_kucoin_classic_spot_subscription_message(kucoin_symbols: &[String]) -> String {
     // Topic: /market/level2:BTC-USDT,ETH-USDT
     let topic_symbols = kucoin_symbols.join(",");
 

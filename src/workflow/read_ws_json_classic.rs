@@ -9,7 +9,7 @@ use tokio::sync::mpsc::{Sender, error::TrySendError};
 use tracing::{debug, error, info, warn};
 
 use crate::{
-    common::error::WebSocketJsonError, exchange::kucoin::json::mapper::to_depth_update,
+    common::error::WebSocketJsonError, mapper::mapper_classic::to_depth_update,
     prometheus::prometheus::Prometheus, workflow::queued_event::QueuedEvent,
 };
 
@@ -24,9 +24,9 @@ use crate::{
 ///
 /// # Returns
 /// Ok(()) if the read was successful, or a WebSocketJsonError otherwise.
-pub async fn read_ws_json(
+pub async fn read_ws_json_classic(
     mut ws: WebSocket<TokioIo<hyper::upgrade::Upgraded>>,
-    tx_dispatch: HashMap<String, Sender<QueuedEvent<DepthUpdate>>>,
+    tx_dispatch: Arc<HashMap<String, Sender<QueuedEvent<DepthUpdate>>>>,
     group_id: String,
     prometheus: Arc<Prometheus>,
     ping_interval_seconds: u64,

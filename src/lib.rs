@@ -8,13 +8,12 @@ pub mod common {
         pub mod utc_micro;
     }
 }
-
-pub mod exchange {
-    pub mod kucoin {
-        pub mod json {
-            pub mod mapper;
-        }
-    }
+pub mod setup {
+    pub mod init_ws_task;
+}
+pub mod mapper {
+    pub mod mapper_classic;
+    pub mod mapper_pro;
 }
 pub mod kafka {
     pub mod client_context;
@@ -23,11 +22,13 @@ pub mod kafka {
 pub mod workflow {
     pub mod process_event;
     pub mod queued_event;
-    pub mod read_ws_json;
+    pub mod read_ws_json_classic;
+    pub mod read_ws_json_pro;
 }
 pub mod websocket {
     pub mod assigner;
-    pub mod connect;
+    pub mod connect_classic;
+    pub mod connect_pro;
 }
 pub mod prometheus {
     pub mod handler;

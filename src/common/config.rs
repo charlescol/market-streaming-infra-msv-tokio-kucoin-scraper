@@ -22,6 +22,7 @@ pub struct Config {
 pub struct KucoinConfig {
     pub host: String,
     pub ping_interval_seconds: u64,
+    pub use_pro: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -90,6 +91,7 @@ impl Config {
                     "KUCOIN_PING_INTERVAL_SECONDS",
                     18, // value recommanded by kucoin
                 )?,
+                use_pro: ConfigLoader::parse_or_default("KUCOIN_USE_PRO", false)?,
             },
 
             workflow: Self::load_workflow_config()?,

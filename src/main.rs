@@ -6,16 +6,13 @@ use anyhow::{Error, Result};
 use msv_tokio_kucoin_scraper::common::config::Config;
 use msv_tokio_kucoin_scraper::kafka::publisher::KafkaPublisher;
 
-use fastwebsockets::Frame;
 use msv_tokio_kucoin_scraper::prometheus::handler::Handler;
 use msv_tokio_kucoin_scraper::prometheus::prometheus::Prometheus;
+use msv_tokio_kucoin_scraper::setup::init_ws_task::{init_ws_classic, init_ws_pro};
 use msv_tokio_kucoin_scraper::websocket::assigner::{Assigner, Group};
-use msv_tokio_kucoin_scraper::websocket::connect::{
-    connect_kucoin, create_kucoin_subscription_message, get_public_token,
-};
+
 use msv_tokio_kucoin_scraper::workflow::process_event::process_event;
 use msv_tokio_kucoin_scraper::workflow::queued_event::QueuedEvent;
-use msv_tokio_kucoin_scraper::workflow::read_ws_json::read_ws_json;
 use schema_core::exchange_depth_update_raw_v1::DepthUpdate;
 use tokio::runtime::Builder;
 use tokio::sync::mpsc::{self, Receiver, Sender};
@@ -136,12 +133,25 @@ async fn create_topology(
     }
 
     let kucoin_config = config.kucoin.clone();
+    let clonable_tx = Arc::new(process_tx);
 
-    // The token is valid for only 24 hours, and a single connection is expected to be disconnected after 24 hours.
-    // TODO: refresh the token and reconnect automatically.
-    info!("Fetching Kucoin public token from {}", kucoin_config.host);
-    let (token, endpoint) = get_public_token(&kucoin_config.host).await?;
-    info!("Got Kucoin token, using endpoint: {}", endpoint);
+    let (token, endpoint) = if !config.kucoin.use_pro {
+        info!("Using Classic API");
+        // The token is valid for only 24 hours, and a single connection is expected to be disconnected after 24 hours.
+        // TODO: refresh the token and reconnect automatically.
+        info!("Fetching Kucoin public token from {}", kucoin_config.host);
+
+        let (t, e) = msv_tokio_kucoin_scraper::websocket::connect_classic::get_public_token(
+            &kucoin_config.host,
+        )
+        .await?;
+        info!("Got Kucoin token, using endpoint: {}", e);
+
+        (Some(t), Some(e))
+    } else {
+        info!("Using Pro API");
+        (None, None)
+    };
 
     for (group_id, stream_group) in stream_groups.iter().enumerate() {
         info!(
@@ -149,31 +159,47 @@ async fn create_topology(
             group_id,
             stream_group.values.join(", ")
         );
-        let process_tx_local = process_tx.clone();
+        let process_tx_local = clonable_tx.clone();
         let prometheus = prometheus.clone();
         let token = token.clone();
         let endpoint = endpoint.clone();
+        let use_pro = config.kucoin.use_pro;
         let ping_interval_seconds = config.kucoin.ping_interval_seconds;
         let symbols = stream_group.values.clone();
+        let group_id_str = group_id.to_string();
         tasks.spawn(async move {
-            let mut ws = connect_kucoin(&endpoint, &token).await?;
+            if use_pro {
+                init_ws_pro(
+                    &symbols,
+                    process_tx_local,
+                    group_id_str,
+                    prometheus,
+                    ping_interval_seconds,
+                )
+                .await
+                .map_err(|e| anyhow::anyhow!("Pro WS init/run failed: {e}"))?;
+            } else {
+                let (token, endpoint) = match (token, endpoint) {
+                    (Some(t), Some(e)) => (t, e),
+                    _ => {
+                        return Err(anyhow::anyhow!(
+                            "Missing token or endpoint for Kucoin Classic API"
+                        ));
+                    }
+                };
+                init_ws_classic(
+                    &endpoint,
+                    &token,
+                    &symbols,
+                    process_tx_local,
+                    group_id_str,
+                    prometheus,
+                    ping_interval_seconds,
+                )
+                .await
+                .map_err(|e| anyhow::anyhow!("Classic WS init/run failed: {e}"))?;
+            }
 
-            // Subscribe
-            let sub_msg = create_kucoin_subscription_message(&symbols);
-            ws.write_frame(Frame::text(fastwebsockets::Payload::Owned(
-                sub_msg.into_bytes(),
-            )))
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to send subscription: {}", e))?;
-
-            read_ws_json(
-                ws,
-                process_tx_local,
-                group_id.to_string(),
-                prometheus,
-                ping_interval_seconds,
-            )
-            .await?;
             Ok(())
         });
     }
