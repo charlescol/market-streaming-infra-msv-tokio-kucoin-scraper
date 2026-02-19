@@ -4,7 +4,7 @@ A high-performance, asynchronous Rust service that scrapes Kucoin WebSocket dept
 
 ## Features
 
-- Accepted input formats: **JSON**
+- Accepted input formats: **JSON** (Kucoin Classic and Pro are both supported)
 - Output format: **Protobuf** (versioned via `Confluent Schema Registry`)
 - Monitoring: `Prometheus`
 - Websocket: `FastWebSockets`
