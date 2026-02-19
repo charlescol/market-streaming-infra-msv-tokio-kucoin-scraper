@@ -135,7 +135,7 @@ async fn create_topology(
     let kucoin_config = config.kucoin.clone();
     let clonable_tx = Arc::new(process_tx);
 
-    let (token, endpoint) = if !config.kucoin.use_pro {
+    let (token, endpoint) = if !config.kucoin.use_pro_api {
         info!("Using Classic API");
         // The token is valid for only 24 hours, and a single connection is expected to be disconnected after 24 hours.
         // TODO: refresh the token and reconnect automatically.
@@ -163,12 +163,12 @@ async fn create_topology(
         let prometheus = prometheus.clone();
         let token = token.clone();
         let endpoint = endpoint.clone();
-        let use_pro = config.kucoin.use_pro;
+        let use_pro_api = config.kucoin.use_pro_api;
         let ping_interval_seconds = config.kucoin.ping_interval_seconds;
         let symbols = stream_group.values.clone();
         let group_id_str = group_id.to_string();
         tasks.spawn(async move {
-            if use_pro {
+            if use_pro_api {
                 init_ws_pro(
                     &symbols,
                     process_tx_local,
