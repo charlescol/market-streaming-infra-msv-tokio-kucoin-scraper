@@ -42,6 +42,8 @@ pub struct WorkflowConfig {
     pub process_group_count: usize,
     pub process_queue_capacity: usize,
     pub max_inflight_by_process_group: usize,
+    pub connection_batch_size: usize,
+    pub connection_batch_delay_seconds: u64,
 }
 
 /// Configuration for the Kafka producer.
@@ -111,6 +113,15 @@ impl Config {
     /// - `Ok(WorkflowConfig)` if the configuration was successfully loaded.
     /// - `Err(ConfigError)` if the configuration could not be loaded.
     pub fn load_workflow_config() -> Result<WorkflowConfig, ConfigError> {
+        let connection_batch_delay_seconds =
+            ConfigLoader::try_parse_env_var("CONNECTION_BATCH_DELAY_SECONDS")?;
+        let connection_batch_size =
+            ConfigLoader::parse_or_default("CONNECTION_BATCH_SIZE", usize::MAX)?;
+        if connection_batch_size < 1 {
+            return Err(ConfigError::InvalidValue(
+                "CONNECTION_BATCH_SIZE must be greater than 0".to_string(),
+            ));
+        }
         Ok(WorkflowConfig {
             stream_group_count: ConfigLoader::try_parse_env_var("STREAM_GROUP_COUNT")?,
             process_group_count: ConfigLoader::try_parse_env_var("PROCESS_GROUP_COUNT")?,
@@ -119,6 +130,8 @@ impl Config {
                 "MAX_INFLIGHT_BY_PROCESS_GROUP",
                 20,
             )?,
+            connection_batch_size,
+            connection_batch_delay_seconds,
         })
     }
 

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{Error, Result};
 
@@ -17,6 +18,7 @@ use schema_core::exchange_depth_update_raw_v1::DepthUpdate;
 use tokio::runtime::Builder;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::task::JoinSet;
+use tokio::time::sleep;
 use tracing::{error, info};
 
 #[cfg(debug_assertions)]
@@ -159,6 +161,8 @@ async fn create_topology(
             group_id,
             stream_group.values.join(", ")
         );
+        let batch_index = group_id / config.workflow.connection_batch_size;
+        let batch_delay_seconds = config.workflow.connection_batch_delay_seconds;
         let process_tx_local = clonable_tx.clone();
         let prometheus = prometheus.clone();
         let token = token.clone();
@@ -168,6 +172,15 @@ async fn create_topology(
         let symbols = stream_group.values.clone();
         let group_id_str = group_id.to_string();
         tasks.spawn(async move {
+            // Delay the start of the batch
+            let delay = batch_index as u64 * batch_delay_seconds;
+            if delay > 0 {
+                info!(
+                    "Delaying stream group {} start by {} seconds",
+                    group_id, delay
+                );
+                sleep(Duration::from_secs(delay)).await;
+            }
             if use_pro_api {
                 init_ws_pro(
                     &symbols,
