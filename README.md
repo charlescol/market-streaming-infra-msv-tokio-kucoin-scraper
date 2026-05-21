@@ -1,6 +1,7 @@
-# Kucoin Depth Update Kafka Scraper
+# Kucoin Feed Handler
 
 A high-performance, asynchronous Rust service that scrapes Kucoin WebSocket depth updates and publishes them to Kafka.
+This repository is part of the [Real-Time Market Data System](https://github.com/charlescol/real-time-market-data-system).
 
 ## Features
 
